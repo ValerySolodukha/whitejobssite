@@ -16,8 +16,9 @@ interface Job {
   location: string;
   category: string;
   description: string;
-  applyUrl: string;
-  postedAt: string;
+  apply_url: string;
+  created_at: string;
+  updated_at: string;
 }
 
 interface SiteContent {
@@ -42,8 +43,9 @@ const defaultJob: Job = {
   location: "",
   category: "",
   description: "",
-  applyUrl: "",
-  postedAt: new Date().toLocaleDateString("he-IL"),
+  apply_url: "",
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString()
 };
 
 const defaultContent: SiteContent = {
@@ -85,30 +87,101 @@ export default function AdminPage() {
   }, [router]);
 
   useEffect(() => {
-    const savedJobs = localStorage.getItem("jobs");
-    const savedContent = localStorage.getItem("siteContent");
-    if (savedJobs) {
-      setJobs(JSON.parse(savedJobs));
-    }
-    if (savedContent) {
-      setSiteContent(JSON.parse(savedContent));
-    }
+    const fetchContent = async () => {
+      const { data, error } = await supabase
+        .from('site_content')
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('Error fetching site content:', error);
+        setSiteContent(defaultContent);
+      } else if (data) {
+        setSiteContent(data);
+      } else {
+        setSiteContent(defaultContent);
+      }
+    };
+
+    fetchContent();
+  }, []);
+
+  useEffect(() => {
+    const fetchJobs = async () => {
+      try {
+        console.log('Fetching jobs from Supabase...');
+        const { data, error } = await supabase
+          .from('jobs')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching jobs:', error.message);
+          console.error('Error details:', error);
+          return;
+        }
+
+        if (data) {
+          console.log('Jobs fetched successfully:', data);
+          // המרה לפורמט הנכון
+          const formattedJobs = data.map(job => ({
+            ...job,
+            apply_url: job.apply_url || '',
+            created_at: job.created_at,
+            updated_at: job.updated_at
+          }));
+          setJobs(formattedJobs);
+        }
+      } catch (err) {
+        console.error('Unexpected error in fetchJobs:', err);
+      }
+    };
+
+    fetchJobs();
   }, []);
 
   const handleAddJob = async () => {
-    const { data, error } = await supabase
-      .from('jobs')
-      .insert([newJob])
-      .select()
+    try {
+      if (!newJob.title || !newJob.location || !newJob.category || !newJob.description) {
+        alert('אנא מלא את כל השדות החובה');
+        return;
+      }
 
-    if (error) {
-      console.error('Error adding job:', error)
-      return
-    }
+      const jobToAdd = {
+        title: newJob.title,
+        location: newJob.location,
+        category: newJob.category,
+        description: newJob.description,
+        apply_url: newJob.apply_url || '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
 
-    if (data) {
-      setJobs([...jobs, data[0]])
-      setNewJob(defaultJob)
+      console.log('Adding job:', jobToAdd);
+
+      const { data, error } = await supabase
+        .from('jobs')
+        .insert([jobToAdd])
+        .select('*');
+
+      if (error) {
+        console.error('Error adding job:', error);
+        alert(`שגיאה בהוספת המשרה: ${error.message}`);
+        return;
+      }
+
+      if (data && data[0]) {
+        console.log('Job added successfully:', data[0]);
+        setJobs(prevJobs => [data[0], ...prevJobs]);
+        setNewJob(defaultJob);
+        alert('המשרה נוספה בהצלחה');
+      } else {
+        console.error('No data returned after insert');
+        alert('אירעה שגיאה בהוספת המשרה - לא התקבלו נתונים מהשרת');
+      }
+    } catch (err) {
+      console.error('Error in handleAddJob:', err);
+      alert('אירעה שגיאה בהוספת המשרה');
     }
   }
 
@@ -120,19 +193,38 @@ export default function AdminPage() {
   const handleUpdateJob = async () => {
     if (!editingJob) return;
     
-    const { error } = await supabase
-      .from('jobs')
-      .update(newJob)
-      .eq('id', editingJob.id)
+    try {
+      const jobToUpdate = {
+        title: newJob.title,
+        location: newJob.location,
+        category: newJob.category,
+        description: newJob.description,
+        apply_url: newJob.apply_url || '',
+        updated_at: new Date().toISOString()
+      };
 
-    if (error) {
-      console.error('Error updating job:', error)
-      return
+      const { data, error } = await supabase
+        .from('jobs')
+        .update(jobToUpdate)
+        .eq('id', editingJob.id)
+        .select('*');
+
+      if (error) {
+        console.error('Error updating job:', error);
+        alert(`שגיאה בעדכון המשרה: ${error.message}`);
+        return;
+      }
+
+      if (data && data[0]) {
+        setJobs(jobs.map(j => j.id === editingJob.id ? data[0] : j));
+        setEditingJob(null);
+        setNewJob(defaultJob);
+        alert('המשרה עודכנה בהצלחה');
+      }
+    } catch (err) {
+      console.error('Error in handleUpdateJob:', err);
+      alert('אירעה שגיאה בעדכון המשרה');
     }
-
-    setJobs(jobs.map(j => j.id === editingJob.id ? { ...newJob, id: editingJob.id } : j))
-    setEditingJob(null)
-    setNewJob(defaultJob)
   }
 
   const handleDeleteJob = async (jobId: string) => {
@@ -200,14 +292,24 @@ export default function AdminPage() {
               הוסף, ערוך או מחק משרות מהמערכת
             </p>
           </div>
-          <Button 
-            variant="outline" 
-            className="bg-white/90 hover:bg-white border-2 border-gray-200 shadow-sm hover:shadow-md transition-all duration-200"
-            onClick={handleLogout}
-          >
-            <LogOut className="h-5 w-5" />
-            התנתקות
-          </Button>
+          <div className="flex gap-4">
+            <Button 
+              variant="outline" 
+              className="bg-white/90 hover:bg-white border-2 border-gray-200 shadow-sm hover:shadow-md transition-all duration-200"
+              onClick={() => router.push("/")}
+            >
+              <ArrowLeft className="h-5 w-5" />
+              חזרה לדף הבית
+            </Button>
+            <Button 
+              variant="outline" 
+              className="bg-white/90 hover:bg-white border-2 border-gray-200 shadow-sm hover:shadow-md transition-all duration-200"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-5 w-5" />
+              התנתקות
+            </Button>
+          </div>
         </div>
 
         <Tabs defaultValue="jobs" className="space-y-8">
@@ -262,8 +364,8 @@ export default function AdminPage() {
                   <div>
                     <label className="block text-sm font-medium mb-2 text-gray-700">קישור להגשת מועמדות</label>
                     <Input
-                      value={newJob.applyUrl}
-                      onChange={(e) => setNewJob({ ...newJob, applyUrl: e.target.value })}
+                      value={newJob.apply_url}
+                      onChange={(e) => setNewJob({ ...newJob, apply_url: e.target.value })}
                       className="h-12 text-lg border-2 border-gray-200 focus:border-gray-400 focus:ring-0 bg-white"
                     />
                   </div>
@@ -416,12 +518,12 @@ export default function AdminPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-2 text-gray-700">תוכן</label>
-                      {siteContent.aboutContent.map((paragraph, index) => (
+                      {(siteContent.aboutContent || defaultContent.aboutContent).map((paragraph, index) => (
                         <div key={index} className="mb-4">
                           <Textarea
                             value={paragraph}
                             onChange={(e) => {
-                              const newContent = [...siteContent.aboutContent];
+                              const newContent = [...(siteContent.aboutContent || defaultContent.aboutContent)];
                               newContent[index] = e.target.value;
                               setSiteContent({ ...siteContent, aboutContent: newContent });
                             }}
@@ -434,7 +536,7 @@ export default function AdminPage() {
                         onClick={() => {
                           setSiteContent({
                             ...siteContent,
-                            aboutContent: [...siteContent.aboutContent, ""]
+                            aboutContent: [...(siteContent.aboutContent || defaultContent.aboutContent), ""]
                           });
                         }}
                         className="mt-2 border-2 border-gray-200 hover:border-gray-400 transition-all duration-200 bg-white/90"

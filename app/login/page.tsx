@@ -17,7 +17,7 @@ export default function LoginPage() {
     e.preventDefault();
     
     // בדיקת פרטי התחברות
-    if (email === "solodohavalery@gmail.com" && password === "$KPRs030102") {
+    if (email === "solodohavalery@gmail.com" && password === "hypsin245") {
       // שמירת מצב התחברות
       localStorage.setItem("isLoggedIn", "true");
       // מעבר לדף הניהול

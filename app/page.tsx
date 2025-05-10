@@ -15,8 +15,9 @@ interface Job {
   location: string;
   category: string;
   description: string;
-  applyUrl: string;
-  postedAt: string;
+  apply_url: string;
+  created_at: string;
+  updated_at: string;
 }
 
 interface SiteContent {
@@ -62,8 +63,9 @@ const demoJobs: Job[] = Array.from({ length: 25 }, (_, i) => ({
   location: "תל אביב",
   category: "פיתוח",
   description: "תיאור מפורט של המשרה...",
-  applyUrl: "#",
-  postedAt: "היום"
+  apply_url: "#",
+  created_at: "היום",
+  updated_at: "היום"
 }));
 
 export default function Home() {
@@ -270,7 +272,7 @@ export default function Home() {
 
                   <div className="flex justify-end">
                     <a
-                      href={job.applyUrl}
+                      href={job.apply_url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-all duration-200 shadow-md hover:shadow-lg text-lg font-medium"
@@ -423,7 +425,7 @@ export default function Home() {
                 </div>
                 <div className="flex justify-end">
                   <a
-                    href={selectedJob.applyUrl}
+                    href={selectedJob.apply_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 px-8 py-4 bg-black text-white rounded-lg hover:bg-gray-800 transition-all duration-200 shadow-md hover:shadow-lg text-lg font-medium"
